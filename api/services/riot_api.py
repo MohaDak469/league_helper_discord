@@ -139,7 +139,7 @@ class RiotAPIClient:
             except httpx.RequestError as e:
                 raise RiotAPIError(f"Request failed: {str(e)}")
     
-    async def get_ranked_data_by_puuid(self, puuid: str, region: str = "na1") -> list[Dict[str, Any]]:
+    async def get_ranked_data_by_puuid(self, puuid: str, region: str = "euw1") -> list[Dict[str, Any]]:
         """
         Get ranked data for a player by PUUID.
         
@@ -190,7 +190,7 @@ class RiotAPIClient:
             "tw2": "https://tw2.api.riotgames.com",
             "vn2": "https://vn2.api.riotgames.com",
         }
-        return regional_map.get(region.lower(), "https://na1.api.riotgames.com")
+        return regional_map.get(region.lower(), "https://euw1.api.riotgames.com")
     
     def _guess_region_from_tag(self, tag_line: str) -> Optional[str]:
         """Try to guess the region from the tag line."""
