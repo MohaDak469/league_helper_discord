@@ -77,7 +77,7 @@ class RiotAPIClient:
             except httpx.RequestError as e:
                 raise RiotAPIError(f"Request failed: {str(e)}")
     
-    async def get_summoner_by_puuid(self, puuid: str, region: str = "na1") -> Dict[str, Any]:
+    async def get_summoner_by_puuid(self, puuid: str, region: str = "euw1") -> Dict[str, Any]:
         """
         Get summoner information by PUUID.
         
@@ -106,7 +106,7 @@ class RiotAPIClient:
             except httpx.RequestError as e:
                 raise RiotAPIError(f"Request failed: {str(e)}")
     
-    async def get_ranked_data(self, summoner_id: str, region: str = "na1") -> list[Dict[str, Any]]:
+    async def get_ranked_data(self, summoner_id: str, region: str = "euw1") -> list[Dict[str, Any]]:
         """
         Get ranked data for a player by summoner ID.
         
