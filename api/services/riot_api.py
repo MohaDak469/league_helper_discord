@@ -211,7 +211,7 @@ class RiotAPIClient:
         }
         return tag_to_region.get(tag_lower)
     
-    async def get_highest_tier(self, game_name: str, tag_line: str, region: str = "na1") -> tuple[Optional[str], Optional[str]]:
+    async def get_highest_tier(self, game_name: str, tag_line: str, region: str = "euw1") -> tuple[Optional[str], Optional[str]]:
         """
         Get the highest tier and rank for a player from ranked solo queue only.
         
