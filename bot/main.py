@@ -51,34 +51,34 @@ class LeagueTeamBot(commands.Bot):
         
        # Sync commands to the tournament server
         # Sync commands to the tournament server
-    try:
-        guild = discord.Object(id=1553131073846911016)
+        try:
+            guild = discord.Object(id=1553131073846911016)
 
-        print("\n🔄 Syncing commands to tournament server...", flush=True)
+            print("\n🔄 Syncing commands to tournament server...", flush=True)
 
-        # Copy all commands currently registered in the bot
-        # to this specific guild
-        self.tree.clear_commands(guild=guild)
-        self.tree.copy_global_to(guild=guild)
+            # Copy all commands currently registered in the bot
+            # to this specific guild
+            self.tree.clear_commands(guild=guild)
+            self.tree.copy_global_to(guild=guild)
 
-        print("📋 Guild commands before sync:", flush=True)
-        for cmd in self.tree.get_commands(guild=guild):
-            print(f"   - /{cmd.name}", flush=True)
+            print("📋 Guild commands before sync:", flush=True)
+            for cmd in self.tree.get_commands(guild=guild):
+                print(f"   - /{cmd.name}", flush=True)
 
-        synced = await self.tree.sync(guild=guild)
+            synced = await self.tree.sync(guild=guild)
 
-        print(
-            f"✅ Synced {len(synced)} command(s) to tournament server",
-            flush=True
-        )
+            print(
+                f"✅ Synced {len(synced)} command(s) to tournament server",
+                flush=True
+            )
 
-        for cmd in synced:
-            print(f"   - /{cmd.name} (ID: {cmd.id})", flush=True)
+            for cmd in synced:
+                print(f"   - /{cmd.name} (ID: {cmd.id})", flush=True)
 
-    except Exception as e:
-        print(f"❌ Failed to sync commands: {e}", flush=True)
-        import traceback
-        traceback.print_exc()
+        except Exception as e:
+            print(f"❌ Failed to sync commands: {e}", flush=True)
+            import traceback
+            traceback.print_exc()
 
         # Attach tree-level error handler (equivalent to @client.tree.error)
         async def _tree_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
