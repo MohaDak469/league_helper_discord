@@ -25,13 +25,12 @@ class ScrimView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-        # Joueurs inscrits par jour
         self.players = {
             day: set()
             for day in DAYS.values()
         }
 
-        # Les 6 prochains jours
+        # Calcul des 6 prochains jours
         today = datetime.now(BRUSSELS_TZ).weekday()
 
         next_days = []
@@ -40,7 +39,7 @@ class ScrimView(discord.ui.View):
             next_day = (today + i) % 7
             next_days.append(DAYS[next_day])
 
-        # Créer les boutons pour chaque jour
+        # Création des boutons
         for index, day in enumerate(next_days):
 
             if index == 0:
@@ -48,7 +47,6 @@ class ScrimView(discord.ui.View):
             else:
                 display_name = day
 
-            # Bouton pour s'inscrire
             self.add_item(
                 ScrimDayButton(
                     day=day,
@@ -57,62 +55,10 @@ class ScrimView(discord.ui.View):
                 )
             )
 
-            # Bouton pour voir les inscrits
-            self.add_item(
-                ScrimPlayersButton(
-                    day=day,
-                    scrim_view=self
-                )
-            )
-
         # Bouton reset
         self.add_item(
             ScrimResetButton(self)
         )
-
-        # Mettre immédiatement les compteurs à jour
-        self.update_buttons()
-
-    def update_buttons(self):
-
-        """
-        Met à jour les boutons X/10 joueurs.
-        """
-
-        for item in self.children:
-
-            if isinstance(item, ScrimPlayersButton):
-
-                count = len(
-                    self.players[item.day]
-                )
-
-                if count >= MAX_PLAYERS:
-
-                    item.label = (
-                        f"{count}/{MAX_PLAYERS} joueurs • 🔴 Complet"
-                    )
-
-                    item.style = discord.ButtonStyle.danger
-
-                else:
-
-                    item.label = (
-                        f"{count}/{MAX_PLAYERS} joueurs • 🟢 Disponible"
-                    )
-
-                    item.style = discord.ButtonStyle.secondary
-
-    def progress_bar(self, count):
-
-        """
-        Barre visuelle dans l'embed.
-        """
-
-        filled = "▰" * count
-        empty = "▱" * (MAX_PLAYERS - count)
-
-        return filled + empty
 
     def update_embed(self):
 
@@ -124,17 +70,14 @@ class ScrimView(discord.ui.View):
                 "Sélectionne les jours où tu es disponible.\n"
                 "Tu peux sélectionner **plusieurs jours**.\n\n"
                 "Clique sur un jour pour t'inscrire ou te retirer.\n"
-                "Clique sur le nombre de joueurs pour voir les inscrits."
+                "Utilise `/inscrits` pour voir les joueurs inscrits."
             ),
             color=discord.Color.blue()
         )
 
-        # Afficher uniquement les jours actuellement présents
         for day in self.players:
 
-            count = len(
-                self.players[day]
-            )
+            count = len(self.players[day])
 
             if count >= MAX_PLAYERS:
                 status = "🔴 **Complet**"
@@ -144,7 +87,6 @@ class ScrimView(discord.ui.View):
             embed.add_field(
                 name=f"📅 {day}",
                 value=(
-                    f"`{self.progress_bar(count)}`\n"
                     f"**{count}/{MAX_PLAYERS} joueurs** • {status}"
                 ),
                 inline=False
@@ -196,9 +138,6 @@ class ScrimDayButton(discord.ui.Button):
 
             players.remove(user_id)
 
-            # Mise à jour des boutons
-            self.scrim_view.update_buttons()
-
             await interaction.response.edit_message(
                 embed=self.scrim_view.update_embed(),
                 view=self.scrim_view
@@ -230,9 +169,6 @@ class ScrimDayButton(discord.ui.Button):
 
         players.add(user_id)
 
-        # Mise à jour des boutons
-        self.scrim_view.update_buttons()
-
         await interaction.response.edit_message(
             embed=self.scrim_view.update_embed(),
             view=self.scrim_view
@@ -240,80 +176,6 @@ class ScrimDayButton(discord.ui.Button):
 
         await interaction.followup.send(
             f"✅ Tu es inscrit pour **{self.day}** !",
-            ephemeral=True
-        )
-
-
-class ScrimPlayersButton(discord.ui.Button):
-
-    def __init__(
-        self,
-        day,
-        scrim_view
-    ):
-
-        self.day = day
-        self.scrim_view = scrim_view
-
-        super().__init__(
-            label="0/10 joueurs • 🟢 Disponible",
-            style=discord.ButtonStyle.secondary,
-            custom_id=f"scrim_players_{day.lower()}"
-        )
-
-    async def callback(
-        self,
-        interaction: discord.Interaction
-    ):
-
-        players = self.scrim_view.players[self.day]
-
-        count = len(players)
-
-        # ==========================================
-        # STATUT
-        # ==========================================
-
-        if count >= MAX_PLAYERS:
-
-            status = "🔴 **Complet**"
-            color = discord.Color.red()
-
-        else:
-
-            status = "🟢 **Disponible**"
-            color = discord.Color.green()
-
-        # ==========================================
-        # LISTE DES JOUEURS
-        # ==========================================
-
-        if players:
-
-            player_list = "\n".join(
-                f"👤 <@{player_id}>"
-                for player_id in players
-            )
-
-        else:
-
-            player_list = "*Aucun joueur inscrit.*"
-
-        # ==========================================
-        # POPUP
-        # ==========================================
-
-        embed = discord.Embed(
-            title=f"📅 {self.day}",
-            description=(
-                f"**{count}/{MAX_PLAYERS} joueurs** • {status}\n\n"
-                f"{player_list}"
-            ),
-            color=color
-        )
-
-        await interaction.response.send_message(
-            embed=embed,
             ephemeral=True
         )
 
@@ -355,11 +217,7 @@ class ScrimResetButton(discord.ui.Button):
         # ==========================================
 
         for day in self.scrim_view.players:
-
             self.scrim_view.players[day].clear()
-
-        # Mettre les boutons à 0/10
-        self.scrim_view.update_buttons()
 
         await interaction.response.edit_message(
             embed=self.scrim_view.update_embed(),
@@ -379,10 +237,17 @@ class AttendanceCommand(commands.Cog):
 
         self.bot = bot
 
+        # On garde une référence aux sondages actifs
+        self.scrim_views = {}
+
     @commands.Cog.listener()
     async def on_ready(self):
 
         print("✅ Attendance system loaded.")
+
+    # ==========================================
+    # /scrim
+    # ==========================================
 
     @discord.app_commands.command(
         name="scrim",
@@ -395,11 +260,140 @@ class AttendanceCommand(commands.Cog):
 
         view = ScrimView()
 
-        embed = view.update_embed()
+        self.scrim_views[interaction.guild.id] = view
 
         await interaction.response.send_message(
-            embed=embed,
+            embed=view.update_embed(),
             view=view
+        )
+
+    # ==========================================
+    # /inscrits
+    # ==========================================
+
+    @discord.app_commands.command(
+        name="inscrits",
+        description="Voir les joueurs inscrits pour chaque jour."
+    )
+    async def inscrits(
+        self,
+        interaction: discord.Interaction
+    ):
+
+        view = self.scrim_views.get(
+            interaction.guild.id
+        )
+
+        if view is None:
+
+            await interaction.response.send_message(
+                "❌ Aucun sondage `/scrim` n'est actuellement actif.",
+                ephemeral=True
+            )
+
+            return
+
+        # Créer une vue avec les 6 jours
+        view_inscrits = InscritsView(view)
+
+        await interaction.response.send_message(
+            "📋 **Choisis un jour pour voir les joueurs inscrits :**",
+            view=view_inscrits,
+            ephemeral=True
+        )
+
+
+class InscritsView(discord.ui.View):
+
+    def __init__(self, scrim_view):
+
+        super().__init__(timeout=120)
+
+        self.scrim_view = scrim_view
+
+        for day in scrim_view.players:
+
+            self.add_item(
+                InscritsDayButton(
+                    day,
+                    scrim_view
+                )
+            )
+
+
+class InscritsDayButton(discord.ui.Button):
+
+    def __init__(
+        self,
+        day,
+        scrim_view
+    ):
+
+        self.day = day
+        self.scrim_view = scrim_view
+
+        count = len(
+            scrim_view.players[day]
+        )
+
+        super().__init__(
+            label=f"{day} — {count}/10",
+            style=discord.ButtonStyle.secondary
+        )
+
+    async def callback(
+        self,
+        interaction: discord.Interaction
+    ):
+
+        players = self.scrim_view.players[self.day]
+
+        count = len(players)
+
+        # ==========================================
+        # LISTE DES JOUEURS
+        # ==========================================
+
+        if players:
+
+            player_list = "\n".join(
+                f"👤 <@{player_id}>"
+                for player_id in players
+            )
+
+        else:
+
+            player_list = "*Aucun joueur inscrit.*"
+
+        # ==========================================
+        # STATUT
+        # ==========================================
+
+        if count >= MAX_PLAYERS:
+
+            status = "🔴 Complet"
+
+        else:
+
+            status = "🟢 Disponible"
+
+        embed = discord.Embed(
+            title=f"📅 {self.day}",
+            description=(
+                f"**{count}/{MAX_PLAYERS} joueurs** • {status}\n\n"
+                f"{player_list}"
+            ),
+            color=(
+                discord.Color.red()
+                if count >= MAX_PLAYERS
+                else discord.Color.green()
+            )
+        )
+
+        await interaction.response.edit_message(
+            content=None,
+            embed=embed,
+            view=None
         )
 
 
