@@ -108,15 +108,6 @@ class LeagueTeamBot(commands.Bot):
         # Force sync commands to each guild to ensure they're available
         # This helps with Discord's caching and ensures commands with permission checks are visible
         print("\n🔄 Syncing commands to each guild...")
-        for guild in self.guilds:
-            try:
-                # Clear any guild-specific commands first to avoid duplicates
-                self.tree.clear_commands(guild=guild)
-                # Sync global commands to this guild (forces Discord to update)
-                synced = await self.tree.sync(guild=guild)
-                print(f"   ✅ Synced {len(synced)} command(s) to '{guild.name}' (ID: {guild.id})")
-            except Exception as e:
-                print(f"   ⚠️ Could not sync commands to '{guild.name}': {e}")
     
     async def on_command_error(self, ctx, error):
         """Handle command errors."""
