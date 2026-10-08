@@ -1,200 +1,177 @@
-"""Scrim registration command."""
+"""Scrim availability command."""
 
 import discord
 from discord import app_commands
 from discord.ext import commands
 from discord.ui import Button, View
 from datetime import datetime
-from typing import Set
+from zoneinfo import ZoneInfo
+from typing import Dict, Set
 
+BRUSSELS_TZ = ZoneInfo("Europe/Brussels")
 
 MAX_PLAYERS = 10
 
+DAYS = {
+    0: "Monday",
+    1: "Tuesday",
+    2: "Wednesday",
+    3: "Thursday",
+    4: "Friday",
+    5: "Saturday",
+    6: "Sunday",
+}
 
-class AttendanceView(View):
-    """View with buttons for scrim registration."""
 
-    def __init__(self):
+class ScrimView(View):
+    """View for scrim day availability."""
+
+    def __init__(self, days):
         super().__init__(timeout=None)
-        self.ready_players: Set[int] = set()
+
+        # Each day has its own set of players
+        self.players: Dict[str, Set[int]] = {
+            day: set() for day in days
+        }
+
+        self.days = days
+
+        # Create one button for each day
+        for day in days:
+            self.add_item(ScrimDayButton(day, self))
 
     def update_embed(self) -> discord.Embed:
-        """Create updated embed with current player list."""
-
-        player_count = len(self.ready_players)
-
-        if player_count >= MAX_PLAYERS:
-            status = "🔒 SCRIM FULL"
-            description = "Registration is closed."
-        else:
-            status = f"🟢 Registration open — {player_count}/{MAX_PLAYERS}"
-            description = "Click **I'm In** if you want to play."
+        """Create the availability embed."""
 
         embed = discord.Embed(
-            title="🏆 Scrim Registration",
-            description=description,
+            title="📅 Scrim Availability",
+            description=(
+                "Choose every day you can play.\n\n"
+                "You can select multiple days."
+            ),
             color=discord.Color.blue()
         )
 
-        if self.ready_players:
-            player_list = "\n".join(
-                f"<@{user_id}>"
-                for user_id in self.ready_players
-            )
+        for day in self.days:
+            player_count = len(self.players[day])
+
+            if player_count >= MAX_PLAYERS:
+                status = "🔒 FULL"
+            else:
+                status = f"🟢 {player_count}/{MAX_PLAYERS}"
+
+            if self.players[day]:
+                player_list = " ".join(
+                    f"<@{user_id}>"
+                    for user_id in self.players[day]
+                )
+            else:
+                player_list = "*Nobody yet*"
 
             embed.add_field(
-                name=f"👥 Players ({player_count}/{MAX_PLAYERS})",
+                name=f"📅 {day} — {status}",
                 value=player_list,
                 inline=False
             )
-        else:
-            embed.add_field(
-                name=f"👥 Players (0/{MAX_PLAYERS})",
-                value="*Nobody has registered yet.*",
-                inline=False
-            )
-
-        embed.add_field(
-            name="📌 Status",
-            value=status,
-            inline=False
-        )
 
         embed.set_footer(
-            text=f"Last updated: {datetime.now().strftime('%H:%M')}"
+            text=f"Last updated: {datetime.now(BRUSSELS_TZ).strftime('%H:%M')}"
         )
 
         return embed
 
-    @discord.ui.button(
-        label="I'm In 🎮",
-        style=discord.ButtonStyle.success,
-        custom_id="attendance_join"
-    )
-    async def join_button(
-        self,
-        interaction: discord.Interaction,
-        button: Button
-    ):
-        """Handle player registration."""
+    async def refresh(self, interaction: discord.Interaction):
+        """Update the Discord message."""
+
+        await interaction.response.edit_message(
+            embed=self.update_embed(),
+            view=self
+        )
+
+
+class ScrimDayButton(Button):
+    """Button for one specific day."""
+
+    def __init__(self, day: str, view: ScrimView):
+        self.day = day
+        self.scrim_view = view
+
+        super().__init__(
+            label=day,
+            style=discord.ButtonStyle.primary,
+            custom_id=f"scrim_day_{day.lower()}"
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        """Handle day selection."""
 
         user_id = interaction.user.id
+        players = self.scrim_view.players[self.day]
 
-        if user_id in self.ready_players:
+        # Already registered → remove them
+        if user_id in players:
+            players.remove(user_id)
+
+            await interaction.response.edit_message(
+                embed=self.scrim_view.update_embed(),
+                view=self.scrim_view
+            )
+
+            await interaction.followup.send(
+                f"❌ Removed you from **{self.day}**.",
+                ephemeral=True
+            )
+
+            return
+
+        # Day is already full
+        if len(players) >= MAX_PLAYERS:
             await interaction.response.send_message(
-                "❌ You are already registered for this scrim.",
+                f"🔒 **{self.day}** is already full (10/10).",
                 ephemeral=True
             )
             return
 
-        if len(self.ready_players) >= MAX_PLAYERS:
-            await interaction.response.send_message(
-                "🔒 This scrim is full (10/10). Registration is closed.",
-                ephemeral=True
-            )
-            return
-
-        self.ready_players.add(user_id)
-
-        embed = self.update_embed()
+        # Add player
+        players.add(user_id)
 
         await interaction.response.edit_message(
-            embed=embed,
-            view=self
+            embed=self.scrim_view.update_embed(),
+            view=self.scrim_view
         )
 
         await interaction.followup.send(
-            f"✅ You are registered! "
-            f"({len(self.ready_players)}/{MAX_PLAYERS})",
-            ephemeral=True
-        )
-
-    @discord.ui.button(
-        label="Leave ❌",
-        style=discord.ButtonStyle.danger,
-        custom_id="attendance_leave"
-    )
-    async def leave_button(
-        self,
-        interaction: discord.Interaction,
-        button: Button
-    ):
-        """Handle player leaving."""
-
-        user_id = interaction.user.id
-
-        if user_id not in self.ready_players:
-            await interaction.response.send_message(
-                "❌ You are not registered for this scrim.",
-                ephemeral=True
-            )
-            return
-
-        self.ready_players.remove(user_id)
-
-        embed = self.update_embed()
-
-        await interaction.response.edit_message(
-            embed=embed,
-            view=self
-        )
-
-        await interaction.followup.send(
-            "❌ You have been removed from the scrim.",
-            ephemeral=True
-        )
-
-    @discord.ui.button(
-        label="Reset 🔄",
-        style=discord.ButtonStyle.secondary,
-        custom_id="attendance_clear"
-    )
-    async def clear_button(
-        self,
-        interaction: discord.Interaction,
-        button: Button
-    ):
-        """Handle resetting the registration list."""
-
-        if not interaction.user.guild_permissions.manage_messages:
-            await interaction.response.send_message(
-                "❌ Only moderators can reset the registration list.",
-                ephemeral=True
-            )
-            return
-
-        self.ready_players.clear()
-
-        embed = self.update_embed()
-
-        await interaction.response.edit_message(
-            embed=embed,
-            view=self
-        )
-
-        await interaction.followup.send(
-            "🔄 Registration list has been reset.",
+            f"✅ Added you to **{self.day}** "
+            f"({len(players)}/{MAX_PLAYERS}).",
             ephemeral=True
         )
 
 
-class AttendanceCommand(commands.Cog):
-    """Command for creating a scrim registration."""
+class ScrimCommand(commands.Cog):
+    """Command for creating scrim availability."""
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
     @app_commands.command(
         name="scrim",
-        description="Create a scrim registration"
+        description="Create a scrim availability poll"
     )
-    async def attendance_check(
+    async def scrim(
         self,
         interaction: discord.Interaction
     ):
-        """Create a scrim registration."""
+        """Create the weekly scrim availability poll."""
+        BRUSSELS_TZ = ZoneInfo("Europe/Brussels")
+        today = datetime.now(BRUSSELS_TZ).weekday()
+        # Get the next 6 days
+        days = []
 
-        view = AttendanceView()
+        for i in range(1, 7):
+            next_day = (today + i) % 7
+            days.append(DAYS[next_day])
+
+        view = ScrimView(days)
         embed = view.update_embed()
 
         await interaction.response.send_message(
@@ -204,6 +181,6 @@ class AttendanceCommand(commands.Cog):
 
 
 async def setup(bot: commands.Bot):
-    """Setup function for the cog."""
+    """Setup the command."""
 
-    await bot.add_cog(AttendanceCommand(bot))
+    await bot.add_cog(ScrimCommand(bot))
