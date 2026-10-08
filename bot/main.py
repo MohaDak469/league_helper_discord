@@ -49,13 +49,22 @@ class LeagueTeamBot(commands.Bot):
             if hasattr(cmd, 'checks'):
                 print(f"     Checks: {cmd.checks}", flush=True)
         
-        # Sync commands globally (available to all guilds)
+       # Sync commands to the tournament server
         try:
-            print("\n🔄 Syncing commands globally...", flush=True)
-            synced = await self.tree.sync()
-            print(f"✅ Synced {len(synced)} command(s) globally", flush=True)
+            guild = discord.Object(id=1553131073846911016)
+
+            print("\n🔄 Syncing commands to tournament server...", flush=True)
+
+            synced = await self.tree.sync(guild=guild)
+
+            print(
+                f"✅ Synced {len(synced)} command(s) to tournament server",
+                flush=True
+            )
+
             for cmd in synced:
-                print(f"   - {cmd.name} (ID: {cmd.id})", flush=True)
+                print(f"   - /{cmd.name} (ID: {cmd.id})", flush=True)
+
         except Exception as e:
             print(f"❌ Failed to sync commands: {e}", flush=True)
             import traceback
@@ -105,9 +114,7 @@ class LeagueTeamBot(commands.Bot):
                 checks_info = f" [has {len(cmd.checks)} check(s)]"
             print(f"   - /{cmd.name}{checks_info}", flush=True)
         
-        # Force sync commands to each guild to ensure they're available
-        # This helps with Discord's caching and ensures commands with permission checks are visible
-        print("\n🔄 Syncing commands to each guild...")
+
     
     async def on_command_error(self, ctx, error):
         """Handle command errors."""
