@@ -22,13 +22,13 @@ class ScrimView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-        # Chaque jour contient un set de Discord IDs
+        # Liste des joueurs inscrits pour chaque jour
         self.players = {
             day: set()
             for day in DAYS.values()
         }
 
-        # Ajouter les 6 prochains jours
+        # Calcul des 6 prochains jours
         today = datetime.now(BRUSSELS_TZ).weekday()
 
         next_days = []
@@ -37,11 +37,19 @@ class ScrimView(discord.ui.View):
             next_day = (today + i) % 7
             next_days.append(DAYS[next_day])
 
+        # Création des boutons
         for day in next_days:
-            self.add_item(ScrimDayButton(day, self))
+            self.add_item(
+                ScrimDayButton(
+                    day,
+                    self
+                )
+            )
 
         # Bouton reset
-        self.add_item(ScrimResetButton(self))
+        self.add_item(
+            ScrimResetButton(self)
+        )
 
     def update_embed(self):
         now = datetime.now(BRUSSELS_TZ)
@@ -50,28 +58,49 @@ class ScrimView(discord.ui.View):
             title="🏆 Disponibilités Scrim",
             description=(
                 "Clique sur les jours où tu peux jouer.\n"
-                "Tu peux sélectionner plusieurs jours.\n\n"
+                "Tu peux sélectionner **plusieurs jours**.\n\n"
+                "🔄 Reclique sur un jour pour te retirer.\n"
                 "⚠️ Maximum **10 joueurs par jour**."
             ),
             color=discord.Color.blue()
         )
 
         for day in self.players:
-            count = len(self.players[day])
+            players = self.players[day]
+            count = len(players)
 
             if count >= MAX_PLAYERS:
-                status = "🔴 COMPLET"
+                status = "🔴 **COMPLET**"
             else:
-                status = "🟢 Disponible"
+                status = "🟢 **Disponible**"
+
+            # Récupération des mentions Discord
+            if players:
+                player_list = "\n".join(
+                    f"👤 <@{player_id}>"
+                    for player_id in players
+                )
+            else:
+                player_list = "Aucun joueur inscrit"
+
+            value = (
+                f"**{count}/{MAX_PLAYERS}** joueurs\n"
+                f"{status}\n\n"
+                f"{player_list}"
+            )
 
             embed.add_field(
                 name=f"📅 {day}",
-                value=f"**{count}/{MAX_PLAYERS}** joueurs\n{status}",
-                inline=True
+                value=value,
+                inline=False
             )
 
         embed.set_footer(
-            text=f"Dernière mise à jour : {now.strftime('%d/%m/%Y à %H:%M')} • Europe/Brussels"
+            text=(
+                f"Dernière mise à jour : "
+                f"{now.strftime('%d/%m/%Y à %H:%M')} "
+                f"• Europe/Brussels"
+            )
         )
 
         return embed
@@ -93,8 +122,12 @@ class ScrimDayButton(discord.ui.Button):
         players = self.scrim_view.players[self.day]
         user_id = interaction.user.id
 
-        # Le joueur est déjà inscrit → le retirer
+        # ==========================================
+        # LE JOUEUR EST DÉJÀ INSCRIT
+        # ==========================================
+
         if user_id in players:
+
             players.remove(user_id)
 
             await interaction.response.edit_message(
@@ -109,15 +142,23 @@ class ScrimDayButton(discord.ui.Button):
 
             return
 
-        # Journée complète
+        # ==========================================
+        # LA JOURNÉE EST COMPLÈTE
+        # ==========================================
+
         if len(players) >= MAX_PLAYERS:
+
             await interaction.response.send_message(
                 f"❌ **{self.day}** est déjà complet (10/10).",
                 ephemeral=True
             )
+
             return
 
-        # Inscription
+        # ==========================================
+        # INSCRIPTION
+        # ==========================================
+
         players.add(user_id)
 
         await interaction.response.edit_message(
@@ -144,13 +185,22 @@ class ScrimResetButton(discord.ui.Button):
 
     async def callback(self, interaction: discord.Interaction):
 
-        # Seulement les admins
+        # ==========================================
+        # VÉRIFICATION ADMIN
+        # ==========================================
+
         if not interaction.user.guild_permissions.administrator:
+
             await interaction.response.send_message(
                 "❌ Tu dois être administrateur pour utiliser ce bouton.",
                 ephemeral=True
             )
+
             return
+
+        # ==========================================
+        # RESET
+        # ==========================================
 
         for day in self.scrim_view.players:
             self.scrim_view.players[day].clear()
