@@ -252,6 +252,7 @@ class RoleConfirmButton(discord.ui.Button):
         )
 
     async def callback(self, interaction: discord.Interaction):
+        print(f"[SCRIM] Confirmer cliqué par {interaction.user.id}", flush=True)
         view = self.role_view
         scrim = view.scrim_view
         user_id = view.user_id
@@ -274,9 +275,12 @@ class RoleConfirmButton(discord.ui.Button):
             )
             return
 
+        print(f"[SCRIM] Inscription de {user_id} pour {day},"f"rôles={view.selected_roles}",flush=True,)
         # Finaliser l'inscription et sauvegarder les rôles en mémoire
         players.add(user_id)
         scrim.roles[day][user_id] = list(view.selected_roles)
+
+        print(f"[SCRIM] Inscription enregistrée : "f"{len(players)}/{MAX_PLAYERS}",flush=True,)
 
         await interaction.response.edit_message(
             content=(
