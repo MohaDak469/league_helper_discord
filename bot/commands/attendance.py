@@ -251,8 +251,10 @@ class RoleConfirmButton(discord.ui.Button):
             style=discord.ButtonStyle.success,
         )
 
+    
     async def callback(self, interaction: discord.Interaction):
         print(f"[SCRIM] Confirmer cliqué par {interaction.user.id}", flush=True)
+
         view = self.role_view
         scrim = view.scrim_view
         user_id = view.user_id
@@ -265,7 +267,6 @@ class RoleConfirmButton(discord.ui.Button):
             )
             return
 
-        # Vérifier à nouveau la capacité du jour
         players = scrim.players[day]
 
         if user_id not in players and len(players) >= MAX_PLAYERS:
@@ -275,13 +276,15 @@ class RoleConfirmButton(discord.ui.Button):
             )
             return
 
-        print(f"[SCRIM] Inscription de {user_id} pour {day},"f"rôles={view.selected_roles}",flush=True,)
-        # Finaliser l'inscription et sauvegarder les rôles en mémoire
         players.add(user_id)
         scrim.roles[day][user_id] = list(view.selected_roles)
 
-        print(f"[SCRIM] Inscription enregistrée : "f"{len(players)}/{MAX_PLAYERS}",flush=True,)
+        print(
+            f"[SCRIM] Inscription enregistrée : {len(players)}/{MAX_PLAYERS}",
+            flush=True,
+        )
 
+        # Répondre immédiatement au clic pour éviter le délai Discord.
         await interaction.response.edit_message(
             content=(
                 f"✅ **Inscription confirmée pour {day} !**\n"
@@ -290,7 +293,11 @@ class RoleConfirmButton(discord.ui.Button):
             view=None,
         )
 
-        await scrim.refresh_message(interaction)
+        # Actualiser le tableau principal après avoir répondu.
+        try:
+            await scrim.refresh_message(interaction)
+        except Exception as error:
+            print(f"[SCRIM] Erreur actualisation du tableau : {error}", flush=True)
 
 
 class RoleCancelButton(discord.ui.Button):
