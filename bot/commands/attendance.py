@@ -1,7 +1,7 @@
 
 import discord
 from discord.ext import commands
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 MAX_PLAYERS = 10
@@ -9,6 +9,7 @@ MIN_ROLES = 1
 MAX_ROLES = 2
 
 BRUSSELS_TZ = ZoneInfo("Europe/Brussels")
+CALENDAR_CHANNEL_ID = 1559631406965989556  
 
 DAYS = {
     0: "Lundi",
@@ -47,6 +48,7 @@ class ScrimView(discord.ui.View):
         }
 
         self.message = None
+        self.calendar_message = None
 
         for index, day in enumerate(self.players):
             display_name = (
@@ -114,15 +116,89 @@ class ScrimView(discord.ui.View):
 
         return embed
 
-    async def refresh_message(self, interaction):
+    
+    def update_calendar_embed(self):
+        now = datetime.now(BRUSSELS_TZ)
+
+        embed = discord.Embed(
+            title="📅 Calendrier des scrims",
+            description=(
+                "Voici les disponibilités pour les six prochains jours.\n"
+                "Inscris-toi via `/scrim` !"
+            ),
+            color=discord.Color.blue(),
+        )
+
+        for offset in range(1, 7):
+            date = now.date() + timedelta(days=offset)
+            day = DAYS[date.weekday()]
+            players = self.players.get(day, set())
+            roles = self.roles.get(day, {})
+
+            player_list = "\n".join(
+                f"• <@{user_id}> — "
+                f"{', '.join(roles.get(user_id, [])) or 'Rôles non définis'}"
+                for user_id in sorted(players)
+            )
+
+            if not player_list:
+                player_list = "*Aucun joueur inscrit pour le moment.*"
+
+            embed.add_field(
+                name=f"📆 {day} {date.strftime('%d/%m/%Y')} — "
+                     f"{len(players)}/{MAX_PLAYERS}",
+                value=player_list,
+                inline=False,
+            )
+
+        embed.set_footer(
+            text=f"Dernière mise à jour : {now.strftime('%d/%m/%Y à %H:%M')} • Europe/Brussels"
+        )
+
+        return embed
+
+
+
+    async def refresh_message(self, interaction=None):
+        # Actualiser le sondage principal
         if self.message is not None:
             try:
                 await self.message.edit(
                     embed=self.update_embed(),
                     view=self,
                 )
-            except discord.HTTPException:
-                pass
+            except discord.HTTPException as error:
+                print(f"[SCRIM] Erreur sondage : {error}", flush=True)
+
+        # Actualiser le calendrier public
+        try:
+            channel = self.message.guild.get_channel(CALENDAR_CHANNEL_ID) if self.message else None
+
+            if channel is None:
+                channel = await self.message.guild.fetch_channel(CALENDAR_CHANNEL_ID)
+
+            if self.calendar_message is None:
+                async for message in channel.history(limit=50):
+                    if (
+                        message.author == channel.guild.me
+                        and message.embeds
+                        and message.embeds[0].title == "📅 Calendrier des scrims"
+                    ):
+                        self.calendar_message = message
+                        break
+
+            if self.calendar_message is None:
+                self.calendar_message = await channel.send(
+                    embed=self.update_calendar_embed()
+                )
+            else:
+                await self.calendar_message.edit(
+                    embed=self.update_calendar_embed()
+                )
+
+        except Exception as error:
+            print(f"[SCRIM] Erreur calendrier : {error}", flush=True)
+
 
 
 class ScrimDayButton(discord.ui.Button):
@@ -150,6 +226,8 @@ class ScrimDayButton(discord.ui.Button):
                 embed=view.update_embed(),
                 view=view,
             )
+
+            await view.refresh_message(interaction)
 
             await interaction.followup.send(
                 f"❌ Tu es désinscrit de **{self.day}**. "
@@ -348,6 +426,8 @@ class ScrimResetButton(discord.ui.Button):
             view=self.scrim_view,
         )
 
+        await self.scrim_view.refresh_message(interaction)
+
         await interaction.followup.send(
             "🔄 Le sondage et toutes les inscriptions ont été réinitialisés.",
             ephemeral=True,
@@ -457,6 +537,7 @@ class AttendanceCommand(commands.Cog):
         )
 
         view.message = await interaction.original_response()
+        await view.refresh_message(interaction)
 
     @discord.app_commands.command(
         name="inscrits",
