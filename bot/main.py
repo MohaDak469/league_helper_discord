@@ -135,11 +135,26 @@ class LeagueTeamBot(commands.Bot):
         traceback.print_exc()
     
     async def on_interaction(self, interaction: discord.Interaction):
-        """Log all interactions for debugging."""
-        if interaction.type == discord.InteractionType.application_command:
-            print(f"[Bot] Received command: {interaction.command.name if interaction.command else 'unknown'} from {interaction.user} ({interaction.user.id})", flush=True)
-            if interaction.command and hasattr(interaction.command, 'checks') and interaction.command.checks:
-                print(f"[Bot] Command has {len(interaction.command.checks)} permission check(s)", flush=True)
+    if interaction.type == discord.InteractionType.application_command:
+        print(
+            f"[Bot] Received command: "
+            f"{interaction.command.name if interaction.command else 'unknown'} "
+            f"from {interaction.user} ({interaction.user.id})",
+            flush=True,
+        )
+
+        if (
+            interaction.command
+            and hasattr(interaction.command, "checks")
+            and interaction.command.checks
+        ):
+            print(
+                f"[Bot] Command has "
+                f"{len(interaction.command.checks)} permission check(s)",
+                flush=True,
+            )
+
+    await super().on_interaction(interaction)
     
     async def on_app_command_error(self, interaction: discord.Interaction, error: discord.app_commands.AppCommandError):
         """Handle application command errors."""
