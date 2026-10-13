@@ -1,7 +1,7 @@
 
 import discord
-from discord.ext import commands
-from datetime import datetime, timedelta
+from discord.ext import commands, tasks
+from datetime import datetime, timedelta, time
 from zoneinfo import ZoneInfo
 
 MAX_PLAYERS = 10
@@ -507,10 +507,50 @@ class InscritsDayButton(discord.ui.Button):
         )
 
 
+
 class AttendanceCommand(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.scrim_views = {}
+        self.daily_refresh.start()
+
+    def cog_unload(self):
+        self.daily_refresh.cancel()
+
+    @tasks.loop(time=time(hour=0, minute=0, tzinfo=BRUSSELS_TZ))
+    async def daily_refresh(self):
+        print("[SCRIM] Renouvellement quotidien du calendrier.", flush=True)
+
+        for guild_id, old_view in list(self.scrim_views.items()):
+            # Créer les six nouvelles journées
+            new_view = ScrimView()
+
+            # Conserver les messages Discord existants
+            new_view.message = old_view.message
+            new_view.calendar_message = old_view.calendar_message
+
+            # Remplacer l'ancienne vue par la nouvelle
+            self.scrim_views[guild_id] = new_view
+
+            # Actualiser le sondage avec les nouveaux boutons
+            if new_view.message is not None:
+                try:
+                    await new_view.message.edit(
+                        embed=new_view.update_embed(),
+                        view=new_view,
+                    )
+                except discord.HTTPException as error:
+                    print(
+                        f"[SCRIM] Erreur renouvellement du sondage : {error}",
+                        flush=True,
+                    )
+
+            # Actualiser le calendrier public existant
+            await new_view.refresh_message()
+
+    @daily_refresh.before_loop
+    async def before_daily_refresh(self):
+        await self.bot.wait_until_ready()
 
     @commands.Cog.listener()
     async def on_ready(self):
