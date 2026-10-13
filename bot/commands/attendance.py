@@ -217,7 +217,11 @@ class RoleSelectMenu(discord.ui.Select):
             discord.SelectOption(
                 label=role,
                 value=role,
-                description=f"Jouer au poste {role}",
+                description=(
+                "Peut jouer n'importe quel rôle"
+                if role == "FILL"
+                else f"Jouer au poste {role}"
+                ),
             )
             for role in ROLES
         ]
